@@ -1,51 +1,44 @@
 # CI/CD Templates for GitHub Actions
 
-Centralne repozytorium z reużywalnymi workflow'ami dla projektów Salesforce i innych.
+Central repository with reusable workflows for Salesforce and other projects.
 
-## 📋 Spis treści
+## 📋 Table of Contents
 
-- [Dostępne workflow'y](#dostępne-workflowy)
-- [Jak używać](#jak-używać)
-- [Konfiguracja secretów](#konfiguracja-secretów)
-- [Przykłady użycia](#przykłady-użycia)
-- [Wymagania](#wymagania)
+- [Available Workflows](#available-workflows)
+- [How to Use](#how-to-use)
+- [Secrets Configuration](#secrets-configuration)
+- [Usage Examples](#usage-examples)
+- [Requirements](#requirements)
+- [Security Best Practices](#security-best-practices)
 
-## 🔄 Dostępne workflow'y
+## 🔄 Available Workflows
 
-### Salesforce CI (pełny pipeline)
+### Salesforce CI (Full Pipeline)
 [.github/workflows/salesforce-ci.yml](.github/workflows/salesforce-ci.yml)
 
-Kompletny pipeline CI dla projektów Salesforce:
-- ✅ Tworzenie scratch org
-- ✅ Deploy kodu
-- ✅ Uruchamianie testów Apex
+Complete CI pipeline for Salesforce projects:
+- ✅ Scratch org creation
+- ✅ Code deployment
+- ✅ Apex test execution
 - ✅ Code coverage
-- ✅ Opcjonalny upload do Codecov
-- ✅ Automatyczne czyszczenie
-
-### Salesforce Validation (bez testów)
-[.github/workflows/salesforce-validation.yml](.github/workflows/salesforce-validation.yml)
-
-Szybka walidacja dla Pull Requestów:
-- ✅ Tworzenie scratch org
-- ✅ Walidacja deploy'u
-- ✅ Bez uruchamiania testów (szybsze)
+- ✅ Optional Codecov upload
+- ✅ Automatic cleanup
 
 ### Salesforce PMD Code Scanner
 [.github/workflows/salesforce-pmd-scanner.yml](.github/workflows/salesforce-pmd-scanner.yml)
 
-Skanowanie jakości kodu Apex za pomocą PMD:
-- ✅ Analiza statyczna kodu
-- ✅ Wykrywanie potencjalnych błędów
-- ✅ Sprawdzanie security best practices
-- ✅ Sprawdzanie wydajności i stylu kodu
-- ✅ Generowanie raportów
+Apex code quality scanning using PMD:
+- ✅ Static code analysis
+- ✅ Potential bug detection
+- ✅ Security best practices verification
+- ✅ Performance and code style checking
+- ✅ Report generation
 
-## 🚀 Jak używać
+## 🚀 How to Use
 
-### Krok 1: Dodaj workflow do swojego projektu
+### Step 1: Add Workflow to Your Project
 
-Utwórz plik `.github/workflows/ci.yml` w swoim repozytorium:
+Create a `.github/workflows/ci.yml` file in your repository:
 
 ```yaml
 name: CI
@@ -69,48 +62,48 @@ jobs:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 ```
 
-### Krok 2: Skonfiguruj sekrety
+### Step 2: Configure Secrets
 
-Dodaj wymagane sekrety w swoim repozytorium (Settings → Secrets and variables → Actions):
+Add required secrets in your repository (Settings → Secrets and variables → Actions):
 
-**Wymagane:**
-- `SFDX_AUTH_URL_DEVHUB` - URL uwierzytelnienia do Dev Hub
+**Required:**
+- `SFDX_AUTH_URL_DEVHUB` - Dev Hub authentication URL
 
-**Opcjonalne:**
-- `CODECOV_TOKEN` - token do uploadu code coverage (jeśli używasz Codecov)
+**Optional:**
+- `CODECOV_TOKEN` - Token for coverage upload (if using Codecov)
 
-## 🔐 Konfiguracja secretów
+## 🔐 Secrets Configuration
 
-### Dla repozytoriów publicznych
-Możesz używać Organization Secrets, które będą automatycznie dostępne we wszystkich publicznych repozytoriach.
+### For Public Repositories
+You can use Organization Secrets, which will be automatically available in all public repositories.
 
-### Dla repozytoriów prywatnych (plan darmowy)
-Niestety plan darmowy GitHub nie udostępnia Organization Secrets dla prywatnych repozytoriów. Musisz ręcznie dodać sekrety w każdym repozytorium:
+### For Private Repositories (Free Plan)
+Unfortunately, GitHub's free plan doesn't provide Organization Secrets for private repositories. You must manually add secrets in each repository:
 
-1. Przejdź do Settings → Secrets and variables → Actions
-2. Kliknij "New repository secret"
-3. Dodaj sekrety z **dokładnie takimi samymi nazwami** jak w templatce
+1. Go to Settings → Secrets and variables → Actions
+2. Click "New repository secret"
+3. Add secrets with **exactly the same names** as in the template
 
-**Ważne:** Nazwy sekretów muszą się zgadzać! Pierwszeństwo ma secret z repozytorium, potem Organization secret.
+**Important:** Secret names must match! Repository secrets take precedence over Organization secrets.
 
-### Jak uzyskać SFDX_AUTH_URL_DEVHUB
+### How to Get SFDX_AUTH_URL_DEVHUB
 
 ```bash
-# Zaloguj się do swojego Dev Hub
+# Log in to your Dev Hub
 sf org login web --alias DevHub --set-default-dev-hub
 
-# Wyświetl auth URL
+# Display auth URL
 sf org display --verbose --target-org DevHub
 ```
 
-Skopiuj wartość `Sfdx Auth Url` i dodaj ją jako secret.
+Copy the `Sfdx Auth Url` value and add it as a secret.
 
-## 📚 Przykłady użycia
+## 📚 Usage Examples
 
-Wszystkie przykłady znajdują się w katalogu [examples](./examples/):
+All examples are located in the [examples](./examples/) directory:
 
-### 1. Pełny CI z testami i Codecov
-[examples/salesforce-full-ci.yml](./examples/salesforce-full-ci.yml)
+### 1. Full CI with Tests and Codecov
+[examples/salesforce-ci.yml](./examples/salesforce-ci.yml)
 ```yaml
 jobs:
   salesforce-ci:
@@ -123,31 +116,8 @@ jobs:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 ```
 
-### 2. Szybka walidacja PR (bez testów)
-[examples/salesforce-pr-validation.yml](./examples/salesforce-pr-validation.yml)
-```yaml
-jobs:
-  validate:
-    uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-validation.yml@main
-    secrets:
-      SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
-```
-
-### 3. Połączona walidacja - szybka dla PR, pełna dla main
-[examples/salesforce-combined-workflow.yml](./examples/salesforce-combined-workflow.yml)
-```yaml
-jobs:
-  pr-validation:
-    if: github.event_name == 'pull_request'
-    uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-validation.yml@main
-
-  main-ci:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
-```
-
-### 4. CI z PMD code quality scanning
-[examples/salesforce-with-pmd.yml](./examples/salesforce-with-pmd.yml)
+### 2. CI with PMD Code Quality Scanning
+[examples/salesforce-ci-with-sast.yml](./examples/salesforce-ci-with-sast.yml)
 ```yaml
 jobs:
   code-quality:
@@ -157,91 +127,206 @@ jobs:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
 ```
 
-## ⚙️ Parametry konfiguracyjne
+## ⚙️ Configuration Parameters
 
 ### Salesforce CI - Inputs
 
-| Parametr | Typ | Domyślna wartość | Opis |
+| Parameter | Type | Default Value | Description |
 |----------|-----|------------------|------|
-| `node-version` | string | `'20'` | Wersja Node.js |
-| `scratch-org-duration` | number | `1` | Czas życia scratch org (dni) |
-| `scratch-org-wait` | number | `30` | Timeout tworzenia scratch org (min) |
-| `deploy-wait` | number | `30` | Timeout deploy'u (min) |
-| `test-wait` | number | `30` | Timeout testów (min) |
-| `test-level` | string | `'RunLocalTests'` | Poziom testów (RunLocalTests, RunAllTestsInOrg) |
-| `scratch-def-file` | string | `'config/project-scratch-def.json'` | Ścieżka do definicji scratch org |
-| `upload-to-codecov` | boolean | `false` | Czy uploadować coverage do Codecov |
-| `codecov-slug` | string | `''` | Slug repozytorium dla Codecov (org/repo) |
+| `node-version` | string | `'20'` | Node.js version |
+| `scratch-org-duration` | number | `1` | Scratch org lifetime (days) |
+| `scratch-org-wait` | number | `30` | Scratch org creation timeout (min) |
+| `deploy-wait` | number | `30` | Deployment timeout (min) |
+| `test-wait` | number | `30` | Test timeout (min) |
+| `test-level` | string | `'RunLocalTests'` | Test level (RunLocalTests, RunAllTestsInOrg) |
+| `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
+| `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
+| `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
 
 ### Salesforce CI - Secrets
 
-| Secret | Wymagany | Opis |
+| Secret | Required | Description |
 |--------|----------|------|
-| `SFDX_AUTH_URL_DEVHUB` | ✅ Tak | URL uwierzytelnienia do Dev Hub |
-| `CODECOV_TOKEN` | ❌ Nie | Token Codecov (tylko jeśli upload-to-codecov=true) |
-
-### Salesforce Validation - Inputs
-
-| Parametr | Typ | Domyślna wartość | Opis |
-|----------|-----|------------------|------|
-| `node-version` | string | `'20'` | Wersja Node.js |
-| `scratch-org-duration` | number | `1` | Czas życia scratch org (dni) |
-| `scratch-org-wait` | number | `30` | Timeout tworzenia scratch org (min) |
-| `deploy-wait` | number | `30` | Timeout deploy'u (min) |
-| `scratch-def-file` | string | `'config/project-scratch-def.json'` | Ścieżka do definicji scratch org |
+| `SFDX_AUTH_URL_DEVHUB` | ✅ Yes | Dev Hub authentication URL |
+| `CODECOV_TOKEN` | ❌ No | Codecov token (only if upload-to-codecov=true) |
 
 ### PMD Scanner - Inputs
 
-| Parametr | Typ | Domyślna wartość | Opis |
+| Parameter | Type | Default Value | Description |
 |----------|-----|------------------|------|
-| `node-version` | string | `'20'` | Wersja Node.js |
-| `pmd-version` | string | `'7.0.0'` | Wersja PMD |
-| `ruleset` | string | `'ruleset.xml'` | Ścieżka do pliku z regułami PMD |
-| `source-path` | string | `'force-app'` | Ścieżka do kodu źródłowego |
-| `fail-on-violation` | boolean | `false` | Czy zakończyć z błędem przy naruszeniach |
+| `node-version` | string | `'20'` | Node.js version |
+| `pmd-version` | string | `'7.0.0'` | PMD version |
+| `ruleset` | string | `'ruleset.xml'` | Path to PMD ruleset file |
+| `source-path` | string | `'force-app'` | Path to source code |
+| `fail-on-violation` | boolean | `false` | Fail on violations |
 
-## 🖥️ Wspierane systemy
+## 🖥️ Supported Systems
 
 - ✅ **Linux** (ubuntu-latest)
-- ✅ **macOS** (można zmienić runner na `macos-latest`)
-- ✅ **Windows** (można zmienić runner na `windows-latest`)
+- ✅ **macOS** (can change runner to `macos-latest`)
+- ✅ **Windows** (can change runner to `windows-latest`)
 
-Aby użyć innego runnera, możesz nadpisać workflow lub stworzyć własną wersję.
+To use a different runner, you can override the workflow or create your own version.
 
-## 📝 Wymagania
+## 📝 Requirements
 
-- **Node.js 20+** (domyślnie, konfigurowalny)
-- **Salesforce CLI** (instalowany automatycznie)
-- **Dev Hub** z pozwoleniem na tworzenie scratch org
-- **Git** (do checkout kodu)
+- **Node.js 20+** (default, configurable)
+- **Salesforce CLI** (installed automatically)
+- **Dev Hub** with scratch org creation permissions
+- **Git** (for code checkout)
 
-## 🔄 Aktualizacje
+## 🔄 Updates
 
-Workflow'y używają tagu `@main`, więc zawsze będą pobierać najnowszą wersję. Jeśli chcesz używać konkretnej wersji:
+Workflows use the `@main` tag, so they will always fetch the latest version. If you want to use a specific version:
 
 ```yaml
 uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@v1.0.0
 ```
 
-## 💡 Najlepsze praktyki
+## 🔒 Security Best Practices
 
-1. **Używaj `@main` dla testów**, `@v1.0.0` dla produkcji
-2. **Dodaj sekrety na poziomie organizacji** dla repozytoriów publicznych
-3. **Dla PR używaj validation** (szybsze, bez testów)
-4. **Dla main używaj pełnego CI** (z testami i coverage)
-5. **Zachowaj spójne nazwy sekretów** we wszystkich repozytoriach
+### Understanding the Security Model
 
-## 🤝 Współpraca
+When you make this repository **public**, the workflow code becomes visible to everyone, but this does **NOT** expose your secrets. Here's why:
 
-Masz pomysł na nowy workflow? Stwórz Pull Request!
+#### ✅ What is Safe (No Security Risk)
 
-1. Fork tego repo
-2. Utwórz branch dla swojego workflow'u
-3. Dodaj workflow w `.github/workflows/`
-4. Dodaj przykład w `examples/`
-5. Zaktualizuj README.md
-6. Utwórz Pull Request
+1. **Secrets are NEVER exposed** in public repositories
+   - GitHub Secrets are encrypted and never visible in logs or code
+   - Even if someone forks your repository, they cannot access your secrets
+   - Workflow logs automatically redact secret values (shown as `***`)
 
-## 📄 Licencja
+2. **Workflow code visibility is normal**
+   - Public reusable workflows are a standard GitHub feature
+   - Your workflow code doesn't contain sensitive data (only references to secrets)
+   - Anyone can see WHAT your workflow does, but not the SECRET VALUES
 
-MIT License - możesz używać tego repozytorium w swoich projektach.
+3. **Organization-level protection**
+   - If this repository is in a GitHub Organization, you can configure access policies
+   - Settings → Actions → General → "Access" section
+   - Choose which repositories can use your reusable workflows
+
+#### ⚠️ Potential Risks and How to Mitigate
+
+1. **Malicious Pull Requests from Forks (PUBLIC REPOS ONLY)**
+   - **Risk**: In public repositories, anyone can fork and create a PR that might try to exfiltrate secrets
+   - **Mitigation**:
+     ```yaml
+     # In your calling repository's workflow:
+     on:
+       pull_request_target:  # DON'T use this with untrusted code!
+         # This gives PR access to secrets - dangerous!
+
+     # Instead, use:
+     on:
+       pull_request:  # ✅ SAFE - secrets not available to forks
+         # Forks won't have access to secrets
+     ```
+   - **Best Practice**: Require approval for workflows from first-time contributors
+     - Go to: Repository Settings → Actions → General
+     - Select "Require approval for first-time contributors"
+
+2. **Accidental Secret Logging**
+   - **Risk**: Someone might accidentally echo secrets in logs
+   - **Mitigation**:
+     - GitHub automatically redacts registered secrets
+     - Never use `set -x` or `echo` with secret variables
+     - Review workflow changes carefully
+
+3. **Scope of Access**
+   - **Risk**: Secrets have access to your entire Dev Hub
+   - **Mitigation**:
+     - Use dedicated CI/CD user with minimal permissions
+     - Create a separate Dev Hub user just for CI/CD
+     - Regularly rotate your `SFDX_AUTH_URL_DEVHUB`
+
+#### 🛡️ Recommended Security Configuration
+
+1. **Enable Branch Protection**
+   ```
+   Repository Settings → Branches → Add branch protection rule
+   ✅ Require pull request reviews before merging
+   ✅ Require status checks to pass before merging
+   ✅ Require linear history
+   ✅ Do not allow bypassing the above settings
+   ```
+
+2. **Configure Workflow Permissions**
+   ```
+   Repository Settings → Actions → General → Workflow permissions
+   ✅ Read repository contents permission (default)
+   ❌ Do NOT enable "Read and write permissions" unless needed
+   ```
+
+3. **Use Environment Secrets for Extra Protection**
+   - Create environments (e.g., "production", "staging")
+   - Add required reviewers for sensitive environments
+   - Store sensitive secrets at environment level, not repository level
+
+4. **Monitor Secret Usage**
+   - Regularly review Actions logs in your repositories
+   - Set up notifications for workflow failures
+   - Check for unusual workflow runs
+
+5. **For Organization Repositories**
+   ```
+   Organization Settings → Actions → General
+
+   "Fork pull request workflows from outside collaborators":
+   ✅ Require approval for first-time contributors who recently created account
+   ✅ Require approval for all outside collaborators
+   ```
+
+#### 📋 Security Checklist Before Making Repository Public
+
+- [ ] Remove any hardcoded credentials or tokens from code
+- [ ] Verify all sensitive data is in GitHub Secrets (not in code)
+- [ ] Enable branch protection on main branch
+- [ ] Set "Require approval for first-time contributors" in Actions settings
+- [ ] Review all workflow files for accidental secret exposure
+- [ ] Use dedicated CI/CD service account with minimal permissions
+- [ ] Document which secrets are required in README
+- [ ] Set up proper access policies if using GitHub Organization
+- [ ] Consider using environment-level secrets for sensitive operations
+
+#### ❓ Common Questions
+
+**Q: If someone forks my public repo, can they see my secrets?**
+A: No, secrets are never copied to forks. Each repository maintains its own secrets.
+
+**Q: Can malicious code in a PR access my secrets?**
+A: Not if you use `pull_request` trigger (recommended). Only use `pull_request_target` with extreme caution.
+
+**Q: What happens if I accidentally commit a secret to git?**
+A: Immediately:
+1. Revoke/rotate the secret in Salesforce
+2. Remove it from git history (use tools like `git filter-branch` or BFG Repo-Cleaner)
+3. Update the secret in GitHub Secrets
+
+**Q: Should I use a personal access token or SFDX Auth URL?**
+A: Use SFDX Auth URL for Salesforce. It's more secure and can be easily revoked.
+
+## 💡 Best Practices
+
+1. **Use `@main` for development**, `@v1.0.0` for production
+2. **Add secrets at organization level** for public repositories
+3. **Keep secret names consistent** across all repositories
+4. **Use dedicated CI/CD service accounts** with minimal required permissions
+5. **Enable branch protection** and require PR reviews
+6. **Regularly audit** workflow runs and secret usage
+7. **Rotate secrets periodically** as part of security hygiene
+
+## 🤝 Contributing
+
+Have an idea for a new workflow? Create a Pull Request!
+
+1. Fork this repository
+2. Create a branch for your workflow
+3. Add workflow in `.github/workflows/`
+4. Add example in `examples/`
+5. Update README.md
+6. Create a Pull Request
+
+## 📄 License
+
+MIT License - you can use this repository in your projects.
