@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: '20'
+      sf-cli-version:
+        description: 'Salesforce CLI version to use (e.g., "2.0.0" or "latest")'
+        required: false
+        type: string
+        default: 'latest'
       scratch-org-duration:
         description: 'Scratch org duration in days'
         required: false
@@ -77,9 +82,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sf-cli-
 
-      - name: ⚡ Install Salesforce CLI
+      - name: ⚡ Install Salesforce CLI ${{ inputs.sf-cli-version }}
         run: |
-          npm install @salesforce/cli --global
+          if [ "${{ inputs.sf-cli-version }}" = "latest" ]; then
+            npm install @salesforce/cli --global
+          else
+            npm install @salesforce/cli@${{ inputs.sf-cli-version }} --global
+          fi
           sf --version
 
       - name: 🔐 Authorize Dev Hub

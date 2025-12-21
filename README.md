@@ -109,6 +109,8 @@ jobs:
   salesforce-ci:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
     with:
+      node-version: '20'
+      sf-cli-version: 'latest'  # or specific version like '2.0.0'
       upload-to-codecov: true
       codecov-slug: ${{ github.repository }}
     secrets:
@@ -134,6 +136,7 @@ jobs:
 | Parameter | Type | Default Value | Description |
 |----------|-----|------------------|------|
 | `node-version` | string | `'20'` | Node.js version |
+| `sf-cli-version` | string | `'latest'` | Salesforce CLI version (e.g., "2.0.0" or "latest") |
 | `scratch-org-duration` | number | `1` | Scratch org lifetime (days) |
 | `scratch-org-wait` | number | `30` | Scratch org creation timeout (min) |
 | `deploy-wait` | number | `30` | Deployment timeout (min) |

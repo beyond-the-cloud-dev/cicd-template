@@ -24,6 +24,7 @@ jobs:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
     with:
       node-version: '20'
+      sf-cli-version: 'latest'  # or specific version like '2.0.0'
       test-level: 'RunLocalTests'
       upload-to-codecov: true
       codecov-slug: ${{ github.repository }}  # Automatically uses current repository
