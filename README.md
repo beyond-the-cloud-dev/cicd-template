@@ -63,7 +63,7 @@ jobs:
       node-version: '20'
       test-level: 'RunLocalTests'
       upload-to-codecov: true
-      codecov-slug: 'your-org/your-repo'
+      codecov-slug: ${{ github.repository }}
     secrets:
       SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -117,7 +117,7 @@ jobs:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
     with:
       upload-to-codecov: true
-      codecov-slug: 'your-org/your-repo'
+      codecov-slug: ${{ github.repository }}
     secrets:
       SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
