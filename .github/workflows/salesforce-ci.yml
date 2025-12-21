@@ -1,0 +1,137 @@
+name: Reusable Salesforce CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+      scratch-org-duration:
+        description: 'Scratch org duration in days'
+        required: false
+        type: number
+        default: 1
+      scratch-org-wait:
+        description: 'Wait time for scratch org creation (minutes)'
+        required: false
+        type: number
+        default: 30
+      deploy-wait:
+        description: 'Wait time for deployment (minutes)'
+        required: false
+        type: number
+        default: 30
+      test-wait:
+        description: 'Wait time for tests (minutes)'
+        required: false
+        type: number
+        default: 30
+      test-level:
+        description: 'Test level (RunLocalTests, RunAllTestsInOrg, etc.)'
+        required: false
+        type: string
+        default: 'RunLocalTests'
+      scratch-def-file:
+        description: 'Path to scratch org definition file'
+        required: false
+        type: string
+        default: 'config/project-scratch-def.json'
+      upload-to-codecov:
+        description: 'Upload coverage to Codecov'
+        required: false
+        type: boolean
+        default: false
+      codecov-slug:
+        description: 'Codecov repository slug (org/repo)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      SFDX_AUTH_URL_DEVHUB:
+        description: 'SFDX Auth URL for Dev Hub'
+        required: true
+      CODECOV_TOKEN:
+        description: 'Codecov token for coverage upload'
+        required: false
+
+jobs:
+  deploy-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout source code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js ${{ inputs.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Cache Salesforce CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-sf-cli-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-sf-cli-
+
+      - name: ⚡ Install Salesforce CLI
+        run: |
+          npm install @salesforce/cli --global
+          sf --version
+
+      - name: 🔐 Authorize Dev Hub
+        run: |
+          echo "${{ secrets.SFDX_AUTH_URL_DEVHUB }}" | sf org login sfdx-url --alias DevHub --set-default-dev-hub --sfdx-url-stdin
+          echo "✓ Successfully authenticated with Dev Hub"
+
+      - name: 🌱 Create scratch org
+        run: |
+          sf org create scratch \
+            --definition-file ${{ inputs.scratch-def-file }} \
+            --alias ScratchOrg \
+            --wait ${{ inputs.scratch-org-wait }} \
+            --duration-days ${{ inputs.scratch-org-duration }} \
+            --set-default
+          echo "✓ Successfully created scratch org"
+
+      - name: 🚀 Deploy source to scratch org
+        run: |
+          sf project deploy start --target-org ScratchOrg --wait ${{ inputs.deploy-wait }}
+          echo "✓ Successfully deployed source"
+
+      - name: 🧪 Run Apex tests
+        run: |
+          sf apex run test \
+            --target-org ScratchOrg \
+            --code-coverage \
+            --result-format human \
+            --output-dir ./tests/apex \
+            --test-level ${{ inputs.test-level }} \
+            --wait ${{ inputs.test-wait }}
+
+      - name: 📊 Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-test-results
+          path: ./tests/apex
+          retention-days: 30
+
+      - name: 📈 Upload coverage to Codecov
+        if: inputs.upload-to-codecov && success()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ inputs.codecov-slug }}
+          flags: Apex
+          files: ./tests/apex/test-result-codecoverage.json
+
+      - name: 🧹 Cleanup scratch org
+        if: always()
+        run: |
+          sf org delete scratch --target-org ScratchOrg --no-prompt || true
+          echo "✓ Scratch org cleanup completed"

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Example PMD Ruleset for Salesforce Apex
+     Copy this file to your project root and customize as needed -->
+<ruleset name="Salesforce Apex Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        PMD ruleset for Salesforce Apex code quality checks
+    </description>
+
+    <!-- Best Practices -->
+    <rule ref="category/apex/bestpractices.xml">
+        <priority>3</priority>
+    </rule>
+
+    <!-- Code Style -->
+    <rule ref="category/apex/codestyle.xml">
+        <priority>3</priority>
+    </rule>
+
+    <!-- Design -->
+    <rule ref="category/apex/design.xml">
+        <priority>3</priority>
+    </rule>
+
+    <!-- Performance -->
+    <rule ref="category/apex/performance.xml">
+        <priority>3</priority>
+    </rule>
+
+    <!-- Security -->
+    <rule ref="category/apex/security.xml">
+        <priority>1</priority>
+    </rule>
+
+    <!-- Error Prone -->
+    <rule ref="category/apex/errorprone.xml">
+        <priority>2</priority>
+    </rule>
+
+</ruleset>

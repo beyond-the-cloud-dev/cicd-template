@@ -1,0 +1,61 @@
+name: Reusable Salesforce PMD Code Scanner
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+      pmd-version:
+        description: 'PMD version to use'
+        required: false
+        type: string
+        default: '7.0.0'
+      ruleset:
+        description: 'PMD ruleset to use'
+        required: false
+        type: string
+        default: 'ruleset.xml'
+      source-path:
+        description: 'Path to source code'
+        required: false
+        type: string
+        default: 'force-app'
+      fail-on-violation:
+        description: 'Fail the build if violations are found'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  pmd-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout source code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run PMD scan
+        uses: pmd/pmd-github-action@v2
+        with:
+          version: ${{ inputs.pmd-version }}
+          sourcePath: ${{ inputs.source-path }}
+          rulesets: ${{ inputs.ruleset }}
+          analyzeModifiedFilesOnly: false
+          createGitHubAnnotations: true
+
+      - name: 📊 Upload PMD results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmd-results
+          path: pmd-report.sarif
+          retention-days: 30
+
+      - name: ❌ Fail on violations
+        if: inputs.fail-on-violation && failure()
+        run: |
+          echo "PMD found violations in the code"
+          exit 1
