@@ -175,6 +175,8 @@ To use a different runner, you can override the workflow or create your own vers
 - **Dev Hub** with scratch org creation permissions
 - **Git** (for code checkout)
 
+**Note:** You don't need `package.json` or `package-lock.json` in your Salesforce projects. The workflow installs Salesforce CLI globally without requiring npm dependencies in your project.
+
 ## 🔄 Updates
 
 Workflows use the `@main` tag, so they will always fetch the latest version. If you want to use a specific version:
