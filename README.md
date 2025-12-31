@@ -19,9 +19,24 @@ Central repository with reusable workflows for Salesforce and other projects.
 Complete CI pipeline for Salesforce projects:
 - ✅ Scratch org creation
 - ✅ Code deployment
-- ✅ Apex test execution
+- ✅ Apex test execution with detailed result parsing
+- ✅ Automatic PR comments with test results
 - ✅ Code coverage
 - ✅ Optional Codecov upload
+- ✅ Automatic cleanup
+
+### Salesforce CI with Build Step
+[.github/workflows/salesforce-ci-with-build.yml](.github/workflows/salesforce-ci-with-build.yml)
+
+CI pipeline for Salesforce projects that require build/compilation:
+- ✅ Node.js dependencies installation
+- ✅ Custom build command execution
+- ✅ Build artifact verification
+- ✅ Scratch org creation and deployment
+- ✅ Apex test execution with detailed result parsing
+- ✅ Automatic PR comments with test results
+- ✅ Code coverage and Codecov upload
+- ✅ Git submodule support
 - ✅ Automatic cleanup
 
 ### Salesforce PMD Code Scanner
@@ -118,7 +133,26 @@ jobs:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 ```
 
-### 2. CI with PMD Code Quality Scanning
+### 2. CI with Build Step (for projects with build process)
+[examples/salesforce-ci-with-build.yml](./examples/salesforce-ci-with-build.yml)
+```yaml
+jobs:
+  salesforce-ci:
+    uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci-with-build.yml@main
+    with:
+      node-version: '20'
+      sf-cli-version: 'latest'
+      build-command: 'npm run package:build'  # Your build command
+      build-artifact-path: 'force-app'  # Path to built source
+      checkout-submodules: true  # If you use git submodules
+      upload-to-codecov: true
+      codecov-slug: ${{ github.repository }}
+    secrets:
+      SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+```
+
+### 3. CI with PMD Code Quality Scanning
 [examples/salesforce-ci-with-sast.yml](./examples/salesforce-ci-with-sast.yml)
 ```yaml
 jobs:
@@ -147,6 +181,31 @@ jobs:
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
 
 ### Salesforce CI - Secrets
+
+| Secret | Required | Description |
+|--------|----------|------|
+| `SFDX_AUTH_URL_DEVHUB` | ✅ Yes | Dev Hub authentication URL |
+| `CODECOV_TOKEN` | ❌ No | Codecov token (only if upload-to-codecov=true) |
+
+### Salesforce CI with Build - Inputs
+
+| Parameter | Type | Default Value | Description |
+|----------|-----|------------------|------|
+| `node-version` | string | `'20'` | Node.js version |
+| `sf-cli-version` | string | `'latest'` | Salesforce CLI version (e.g., "2.0.0" or "latest") |
+| `scratch-org-duration` | number | `1` | Scratch org lifetime (days) |
+| `scratch-org-wait` | number | `30` | Scratch org creation timeout (min) |
+| `deploy-wait` | number | `30` | Deployment timeout (min) |
+| `test-wait` | number | `30` | Test timeout (min) |
+| `test-level` | string | `'RunLocalTests'` | Test level (RunLocalTests, RunAllTestsInOrg) |
+| `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
+| `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
+| `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
+| `build-command` | string | **required** | Command to build/generate source (e.g., "npm run build") |
+| `build-artifact-path` | string | `'force-app'` | Path to the built source code directory |
+| `checkout-submodules` | boolean | `false` | Whether to checkout git submodules |
+
+### Salesforce CI with Build - Secrets
 
 | Secret | Required | Description |
 |--------|----------|------|
