@@ -1,0 +1,195 @@
+name: Salesforce CI with Build Step
+
+# Reusable workflow for Salesforce projects that need to build source before deployment
+# Copy this file to: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci-with-build.yml
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+      sf-cli-version:
+        description: 'Salesforce CLI version to use (e.g., "2.0.0" or "latest")'
+        required: false
+        type: string
+        default: 'latest'
+      scratch-org-duration:
+        description: 'Scratch org duration in days'
+        required: false
+        type: number
+        default: 1
+      scratch-org-wait:
+        description: 'Wait time for scratch org creation (minutes)'
+        required: false
+        type: number
+        default: 30
+      deploy-wait:
+        description: 'Wait time for deployment (minutes)'
+        required: false
+        type: number
+        default: 30
+      test-wait:
+        description: 'Wait time for tests (minutes)'
+        required: false
+        type: number
+        default: 30
+      test-level:
+        description: 'Test level (NoTestRun, RunSpecifiedTests, RunLocalTests, RunAllTestsInOrg)'
+        required: false
+        type: string
+        default: 'RunLocalTests'
+      scratch-def-file:
+        description: 'Path to scratch org definition file'
+        required: false
+        type: string
+        default: 'config/project-scratch-def.json'
+      upload-to-codecov:
+        description: 'Upload coverage to Codecov'
+        required: false
+        type: boolean
+        default: false
+      codecov-slug:
+        description: 'Codecov repository slug (org/repo)'
+        required: false
+        type: string
+        default: ''
+      build-command:
+        description: 'Command to build/generate source code (e.g., "npm run build", "npm run package:build")'
+        required: true
+        type: string
+      build-artifact-path:
+        description: 'Path to the built source code directory (e.g., "force-app", "dist")'
+        required: false
+        type: string
+        default: 'force-app'
+      scratch-org-def-file:
+        description: 'Path to scratch org definition file'
+        required: false
+        type: string
+        default: 'config/project-scratch-def.json'
+      checkout-submodules:
+        description: 'Whether to checkout git submodules'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      SFDX_AUTH_URL_DEVHUB:
+        description: 'SFDX Auth URL for Dev Hub'
+        required: true
+      CODECOV_TOKEN:
+        description: 'Codecov token for coverage upload'
+        required: false
+
+jobs:
+  build-deploy-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout source code
+        uses: actions/checkout@v4
+        with:
+          submodules: ${{ inputs.checkout-submodules && 'recursive' || 'false' }}
+
+      - name: 🟢 Setup Node.js ${{ inputs.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: 📦 Install Node dependencies
+        run: npm ci
+
+      - name: 🔨 Build source code
+        run: ${{ inputs.build-command }}
+        env:
+          NODE_ENV: production
+
+      - name: ✅ Verify build output
+        run: |
+          if [ ! -d "${{ inputs.build-artifact-path }}" ]; then
+            echo "❌ Build artifact directory not found: ${{ inputs.build-artifact-path }}"
+            echo "   The build command may have failed or the path is incorrect."
+            exit 1
+          fi
+
+          FILE_COUNT=$(find "${{ inputs.build-artifact-path }}" -type f | wc -l)
+          echo "✅ Build successful!"
+          echo "   Artifact path: ${{ inputs.build-artifact-path }}"
+          echo "   Total files: $FILE_COUNT"
+
+          # Show directory structure for debugging
+          echo ""
+          echo "📁 Build artifact structure:"
+          tree -L 3 "${{ inputs.build-artifact-path }}" || find "${{ inputs.build-artifact-path }}" -type d -maxdepth 3
+
+      - name: 📦 Cache Salesforce CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-sf-cli-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-sf-cli-
+
+      - name: ⚡ Install Salesforce CLI ${{ inputs.sf-cli-version }}
+        run: |
+          if [ "${{ inputs.sf-cli-version }}" = "latest" ]; then
+            npm install @salesforce/cli --global
+          else
+            npm install @salesforce/cli@${{ inputs.sf-cli-version }} --global
+          fi
+          sf --version
+
+      - name: 🔐 Authorize Dev Hub
+        run: |
+          echo "${{ secrets.SFDX_AUTH_URL_DEVHUB }}" | sf org login sfdx-url --alias DevHub --set-default-dev-hub --sfdx-url-stdin
+          echo "✓ Successfully authenticated with Dev Hub"
+
+      - name: 🌱 Create scratch org
+        run: |
+          sf org create scratch \
+            --definition-file ${{ inputs.scratch-def-file }} \
+            --alias ScratchOrg \
+            --wait ${{ inputs.scratch-org-wait }} \
+            --duration-days ${{ inputs.scratch-org-duration }} \
+            --set-default
+          echo "✓ Successfully created scratch org"
+
+      - name: 🚀 Deploy source to scratch org
+        run: |
+          sf project deploy start --target-org ScratchOrg --wait ${{ inputs.deploy-wait }}
+          echo "✓ Successfully deployed source"
+
+      - name: 🧪 Run Apex tests
+        run: |
+          sf apex run test \
+            --target-org ScratchOrg \
+            --code-coverage \
+            --result-format human \
+            --output-dir ./tests/apex \
+            --test-level ${{ inputs.test-level }} \
+            --wait ${{ inputs.test-wait }}
+
+      - name: 📊 Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-test-results
+          path: ./tests/apex
+          retention-days: 30
+
+      - name: 📈 Upload coverage to Codecov
+        if: inputs.upload-to-codecov && inputs.codecov-slug != '' && success()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ${{ inputs.codecov-slug }}
+          flags: Apex
+          files: ./tests/apex/test-result-codecoverage.json
+
+      - name: 🧹 Cleanup scratch org
+        if: always()
+        run: |
+          sf org delete scratch --target-org ScratchOrg --no-prompt || true
+          echo "✓ Scratch org cleanup completed"
