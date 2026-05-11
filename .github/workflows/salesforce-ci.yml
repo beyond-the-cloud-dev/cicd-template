@@ -112,7 +112,7 @@ jobs:
 
       - name: 🚀 Deploy source to scratch org
         run: |
-          sf project deploy start --source-dir force-app --target-org ScratchOrg --wait ${{ inputs.deploy-wait }}
+          sf project deploy start --target-org ScratchOrg --wait ${{ inputs.deploy-wait }}
           echo "✓ Successfully deployed source"
 
       - name: 🧪 Run Apex tests
