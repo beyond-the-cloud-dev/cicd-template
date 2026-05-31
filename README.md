@@ -108,10 +108,10 @@ Unfortunately, GitHub's free plan doesn't provide Organization Secrets for priva
 sf org login web --alias DevHub --set-default-dev-hub
 
 # Display auth URL
-sf org display --verbose --target-org DevHub
+sf org auth show-sfdx-auth-url --target-org DevHub
 ```
 
-Copy the `Sfdx Auth Url` value and add it as a secret.
+Copy the `force://` auth URL value and add it as a secret.
 
 ## 📚 Usage Examples
 
