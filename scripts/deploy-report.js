@@ -22,6 +22,9 @@ const MAX_LINES_PER_ROW = 5;
 const MAX_ANNOTATIONS = 10;
 const MAX_TEST_FAILURES = 20;
 
+// "Dependent class is invalid and needs recompilation: Class btcdev.A : Dependent class ... : <root problem>"
+const CASCADE_PREFIX = /^(?:Dependent class is invalid and needs recompilation: Class \S+ : )+/i;
+
 function main() {
   const [, , inputArg, outputArg] = process.argv;
   const inputFile = inputArg || process.env.DEPLOY_RESULT_FILE || "./tests/apex/deploy-result.json";
@@ -178,7 +181,7 @@ function collectFailures(result, workspace) {
     .map((f) => ({
       type: f.type,
       fullName: f.fullName,
-      problem: stripLocation(f.error),
+      problem: oneLine(stripLocation(f.error)),
       problemType: f.problemType || "Error",
       filePath: relativePath(f.filePath, workspace),
       line: f.lineNumber,
@@ -194,7 +197,7 @@ function collectFailures(result, workspace) {
     .map((f) => ({
       type: f.componentType,
       fullName: f.fullName,
-      problem: stripLocation(f.problem),
+      problem: oneLine(stripLocation(f.problem)),
       problemType: f.problemType || "Error",
       filePath: f.fileName,
       line: f.lineNumber,
@@ -214,16 +217,49 @@ function groupFailures(failures) {
       map.get(key).locations.push({ line: f.line, column: f.column });
     }
   }
-  return [...map.values()].map((g) => ({
-    ...g,
-    locations: g.locations.sort((a, b) => a.line - b.line),
-    tip: findTip(g.problem),
-  }));
+  return [...map.values()].map((g) => {
+    const rootProblem = g.problem.replace(CASCADE_PREFIX, "");
+    const cascade = rootProblem !== g.problem;
+    return {
+      ...g,
+      locations: g.locations.sort((a, b) => a.line - b.line),
+      cascade,
+      rootProblem,
+      tip: (cascade && findTip(rootProblem)) || findTip(g.problem),
+    };
+  });
+}
+
+// Splits groups into real errors and "dependent class is invalid" cascades.
+// If every error is a cascade (the broken class is outside this deploy), the
+// cascades are promoted to one row per distinct root problem.
+function splitCascades(groups) {
+  const roots = groups.filter((g) => !g.cascade);
+  const cascades = groups.filter((g) => g.cascade);
+  const byRoot = new Map();
+  for (const g of cascades) {
+    if (!byRoot.has(g.rootProblem)) byRoot.set(g.rootProblem, []);
+    byRoot.get(g.rootProblem).push(g);
+  }
+  const promoted =
+    roots.length === 0
+      ? [...byRoot.entries()].map(([problem, list]) => ({
+          type: "dependent",
+          fullName: `${list.length} class(es)`,
+          problem,
+          locations: [],
+          filePath: "",
+          tip: list[0].tip,
+        }))
+      : [];
+  return { roots: roots.concat(promoted), cascades, byRoot };
 }
 
 function collectTips(groups) {
   const byId = new Map();
-  for (const g of groups) {
+  // Root errors first so their component names lead the hint, cascades after.
+  const ordered = groups.filter((g) => !g.cascade).concat(groups.filter((g) => g.cascade));
+  for (const g of ordered) {
     if (!g.tip) continue;
     if (!byId.has(g.tip.id)) {
       byId.set(g.tip.id, { tip: g.tip, components: new Set() });
@@ -255,18 +291,33 @@ function renderMarkdown({ status, result, errors, warnings, groups, tips, testFa
   lines.push("### ❌ Deployment failed", "", stats, "");
 
   if (groups.length > 0) {
+    const { roots, cascades, byRoot } = splitCascades(groups);
     const componentCount = new Set(groups.map((g) => `${g.type}:${g.fullName}`)).size;
+    const cascadeNote = cascades.length > 0 ? `, ${cascades.length} of them only because a dependency failed` : "";
     lines.push(
-      `**${errors.length} error(s)** in ${componentCount} component(s)`,
+      `**${errors.length} error(s)** in ${componentCount} component(s)${cascadeNote}`,
       "",
       "| Component | Problem | Line |",
       "| --- | --- | --- |"
     );
-    for (const g of groups.slice(0, MAX_TABLE_ROWS)) {
+    for (const g of roots.slice(0, MAX_TABLE_ROWS)) {
       lines.push(`| \`${g.type}\` **${escapeMd(g.fullName)}** | ${escapeMd(g.problem)} | ${formatLocations(g.locations)} |`);
     }
-    if (groups.length > MAX_TABLE_ROWS) {
-      lines.push("", `_... and ${groups.length - MAX_TABLE_ROWS} more. See the workflow logs or the \`apex-test-results\` artifact._`);
+    if (roots.length > MAX_TABLE_ROWS) {
+      lines.push("", `_... and ${roots.length - MAX_TABLE_ROWS} more. See the workflow logs or the \`apex-test-results\` artifact._`);
+    }
+    if (cascades.length > 0) {
+      lines.push(
+        "",
+        `<details><summary>⛓️ ${cascades.length} dependent component(s) that fail only because of the above</summary>`,
+        ""
+      );
+      for (const [problem, list] of byRoot) {
+        const names = list.slice(0, 30).map((g) => `\`${g.fullName}\``).join(", ");
+        const more = list.length > 30 ? ` +${list.length - 30} more` : "";
+        lines.push(`- ${escapeMd(problem)}`, `  └─ ${names}${more}`);
+      }
+      lines.push("", "</details>");
     }
   } else if (testFailures.length === 0 && coverageWarnings.length === 0) {
     lines.push("No component failures were reported. Check the workflow logs for details.");
@@ -329,7 +380,8 @@ function formatLocations(locations) {
 
 function renderAnnotations(groups) {
   const out = [];
-  for (const g of groups) {
+  const roots = groups.filter((g) => !g.cascade);
+  for (const g of roots.length > 0 ? roots : groups) {
     if (out.length >= MAX_ANNOTATIONS) break;
     const loc = g.locations[0];
     const props = [];
@@ -350,12 +402,20 @@ function renderConsole({ status, result, errors, groups, tips, testFailures }) {
     return lines.join("\n");
   }
   lines.push("     DEPLOYMENT FAILED", "==========================================", deployStats(result), "");
+  const { roots, cascades, byRoot } = splitCascades(groups);
   lines.push(`${errors.length} error(s):`, "");
-  for (const g of groups.slice(0, MAX_TABLE_ROWS)) {
+  for (const g of roots.slice(0, MAX_TABLE_ROWS)) {
     lines.push(`❌ ${g.type} ${g.fullName}`);
     lines.push(`   ${g.problem}`);
     if (g.locations.length > 0) lines.push(`   lines: ${formatLocations(g.locations)}`);
     if (g.filePath) lines.push(`   file: ${g.filePath}`);
+    lines.push("");
+  }
+  if (cascades.length > 0) {
+    lines.push(`⛓️ ${cascades.length} dependent component(s) fail only because of the above:`);
+    for (const [problem, list] of byRoot) {
+      lines.push(`   ${problem}`, `   └─ ${list.map((g) => g.fullName).join(", ")}`);
+    }
     lines.push("");
   }
   for (const t of testFailures.slice(0, MAX_TEST_FAILURES)) {

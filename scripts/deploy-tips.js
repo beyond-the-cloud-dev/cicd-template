@@ -28,6 +28,13 @@ const TIPS = [
       "The referenced class is not in the deploy. Make sure it lives in a `packageDirectories` path in `sfdx-project.json`, or vendor the dependency (e.g. soql-lib under `dependencies/`).",
   },
   {
+    id: "global-signature",
+    label: "Global method with non-global type",
+    match: /global methods do not support (parameter|return) type of|(parameter|return) type of .* must be global|must be declared as global/i,
+    hint:
+      "A `global` method can only use `global` types in its signature. Make the parameter/return class global as well, or drop `global` from the method. Packaging scripts that rewrite `public` to `global` (async-lib, apexfluently) must cover every type the API exposes.",
+  },
+  {
     id: "dependent-class-invalid",
     label: "Dependent class invalid",
     match: /Dependent class is invalid and needs recompilation/i,
