@@ -56,6 +56,11 @@ on:
         required: false
         type: string
         default: ''
+      template-ref:
+        description: 'Git ref of cicd-template to take the report scripts from. Match it with the ref in `uses:` when testing a template branch'
+        required: false
+        type: string
+        default: 'main'
       build-command:
         description: 'Command to build/generate source code (e.g., "npm run build", "npm run package:build")'
         required: true
@@ -92,14 +97,13 @@ jobs:
         with:
           submodules: ${{ inputs.checkout-submodules && 'recursive' || 'false' }}
 
-      # Scripts live in this template repo, not in the caller. Check them out at the
-      # exact commit of the reusable workflow that is running, so branches of the
-      # template can be tested by pointing `uses:` at them.
+      # Scripts live in this template repo, not in the caller, so check them out.
+      # github.job_workflow_sha is empty for reusable workflows, hence the input.
       - name: 📥 Checkout CI scripts
         uses: actions/checkout@v4
         with:
           repository: beyond-the-cloud-dev/cicd-template
-          ref: ${{ github.job_workflow_sha }}
+          ref: ${{ inputs.template-ref }}
           path: .cicd-template
           sparse-checkout: scripts
 

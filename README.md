@@ -61,11 +61,15 @@ Parsing and PR commenting live in [`scripts/`](./scripts/), not inline in the wo
 | `scripts/deploy-tips.js` | List of known deployment error patterns with a short hint on how to fix each one. Add a new entry when you hit an error that deserves a hint |
 | `scripts/pr-comment.js` | Builds and posts (or updates) the single `🚀 Salesforce CI` comment on the pull request from the deploy report and test summary |
 
-A reusable workflow runs in the caller's checkout, so the workflow checks this repo out into `.cicd-template/` at `github.job_workflow_sha`, the exact commit of the workflow that is running. That means a branch of this repo can be tested end to end from any project by pointing `uses:` at it:
+A reusable workflow runs in the caller's checkout, so the workflow checks this repo out into `.cicd-template/` at the `template-ref` input (default `main`). To test a branch of this repo end to end from any project, point both `uses:` and `template-ref` at it:
 
 ```yaml
 uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@my-branch
+with:
+  template-ref: my-branch
 ```
+
+If you pin `uses:` to a tag, pin `template-ref` to the same tag so workflow and scripts stay in sync.
 
 Run the deploy parser locally against a saved result:
 
@@ -206,6 +210,7 @@ jobs:
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
+| `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
 
 ### Salesforce CI - Secrets
 
@@ -228,6 +233,7 @@ jobs:
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
+| `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
 | `build-command` | string | **required** | Command to build/generate source (e.g., "npm run build") |
 | `build-artifact-path` | string | `'force-app'` | Path to the built source code directory |
 | `checkout-submodules` | boolean | `false` | Whether to checkout git submodules |
