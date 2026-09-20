@@ -5,6 +5,7 @@ Central repository with reusable workflows for Salesforce and other projects.
 ## 📋 Table of Contents
 
 - [Available Workflows](#available-workflows)
+- [Report Scripts](#report-scripts)
 - [How to Use](#how-to-use)
 - [Secrets Configuration](#secrets-configuration)
 - [Usage Examples](#usage-examples)
@@ -18,9 +19,10 @@ Central repository with reusable workflows for Salesforce and other projects.
 
 Complete CI pipeline for Salesforce projects:
 - ✅ Scratch org creation
-- ✅ Code deployment
+- ✅ Code deployment with parsed error report and fix hints
 - ✅ Apex test execution with detailed result parsing
-- ✅ Automatic PR comments with test results
+- ✅ Automatic PR comments with deployment and test results
+- ✅ GitHub annotations on failing files
 - ✅ Code coverage
 - ✅ Optional Codecov upload
 - ✅ Automatic cleanup
@@ -32,9 +34,9 @@ CI pipeline for Salesforce projects that require build/compilation:
 - ✅ Node.js dependencies installation
 - ✅ Custom build command execution
 - ✅ Build artifact verification
-- ✅ Scratch org creation and deployment
+- ✅ Scratch org creation and deployment with parsed error report
 - ✅ Apex test execution with detailed result parsing
-- ✅ Automatic PR comments with test results
+- ✅ Automatic PR comments with deployment and test results
 - ✅ Code coverage and Codecov upload
 - ✅ Git submodule support
 - ✅ Automatic cleanup
@@ -48,6 +50,31 @@ Apex code quality scanning using PMD:
 - ✅ Security best practices verification
 - ✅ Performance and code style checking
 - ✅ Report generation
+
+## 🧩 Report Scripts
+
+Parsing and PR commenting live in [`scripts/`](./scripts/), not inline in the workflow YAML:
+
+| Script | What it does |
+|--------|--------------|
+| `scripts/deploy-report.js` | Reads the JSON output of `sf project deploy start --json`, groups component failures, writes a Markdown report (PR comment + job summary), emits `::error file=...,line=...` annotations and sets step outputs `status`, `error_count`, `warning_count`, `summary_file` |
+| `scripts/deploy-tips.js` | List of known deployment error patterns with a short hint on how to fix each one. Add a new entry when you hit an error that deserves a hint |
+| `scripts/pr-comment.js` | Builds and posts (or updates) the single `🚀 Salesforce CI` comment on the pull request from the deploy report and test summary |
+
+A reusable workflow runs in the caller's checkout, so the workflow checks this repo out into `.cicd-template/` at `github.job_workflow_sha`, the exact commit of the workflow that is running. That means a branch of this repo can be tested end to end from any project by pointing `uses:` at it:
+
+```yaml
+uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@my-branch
+```
+
+Run the deploy parser locally against a saved result:
+
+```bash
+sf project deploy start --target-org MyOrg --json > deploy-result.json
+node scripts/deploy-report.js deploy-result.json deploy-summary.md
+```
+
+When the deployment fails the workflow skips the Apex tests, comments the PR with the failing components, lines and hints, and fails the job. When it succeeds the comment shows the test summary as before.
 
 ## 🚀 How to Use
 
