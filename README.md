@@ -5,6 +5,7 @@ Central repository with reusable workflows for Salesforce and other projects.
 ## 📋 Table of Contents
 
 - [Available Workflows](#available-workflows)
+- [Report Scripts](#report-scripts)
 - [How to Use](#how-to-use)
 - [Secrets Configuration](#secrets-configuration)
 - [Usage Examples](#usage-examples)
@@ -18,9 +19,10 @@ Central repository with reusable workflows for Salesforce and other projects.
 
 Complete CI pipeline for Salesforce projects:
 - ✅ Scratch org creation
-- ✅ Code deployment
+- ✅ Code deployment with parsed error report and fix hints
 - ✅ Apex test execution with detailed result parsing
-- ✅ Automatic PR comments with test results
+- ✅ Automatic PR comments with deployment and test results
+- ✅ GitHub annotations on failing files
 - ✅ Code coverage
 - ✅ Optional Codecov upload
 - ✅ Automatic cleanup
@@ -32,9 +34,9 @@ CI pipeline for Salesforce projects that require build/compilation:
 - ✅ Node.js dependencies installation
 - ✅ Custom build command execution
 - ✅ Build artifact verification
-- ✅ Scratch org creation and deployment
+- ✅ Scratch org creation and deployment with parsed error report
 - ✅ Apex test execution with detailed result parsing
-- ✅ Automatic PR comments with test results
+- ✅ Automatic PR comments with deployment and test results
 - ✅ Code coverage and Codecov upload
 - ✅ Git submodule support
 - ✅ Automatic cleanup
@@ -48,6 +50,35 @@ Apex code quality scanning using PMD:
 - ✅ Security best practices verification
 - ✅ Performance and code style checking
 - ✅ Report generation
+
+## 🧩 Report Scripts
+
+Parsing and PR commenting live in [`scripts/`](./scripts/), not inline in the workflow YAML:
+
+| Script | What it does |
+|--------|--------------|
+| `scripts/deploy-report.js` | Reads the JSON output of `sf project deploy start --json`, groups component failures, writes a Markdown report (PR comment + job summary), emits `::error file=...,line=...` annotations and sets step outputs `status`, `error_count`, `warning_count`, `summary_file` |
+| `scripts/deploy-tips.js` | List of known deployment error patterns with a short hint on how to fix each one. Add a new entry when you hit an error that deserves a hint |
+| `scripts/pr-comment.js` | Builds and posts (or updates) the single `🚀 Salesforce CI` comment on the pull request from the deploy report and test summary |
+
+A reusable workflow runs in the caller's checkout, so the workflow checks this repo out into `.cicd-template/` at the `template-ref` input (default `main`). To test a branch of this repo end to end from any project, point both `uses:` and `template-ref` at it:
+
+```yaml
+uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@my-branch
+with:
+  template-ref: my-branch
+```
+
+If you pin `uses:` to a tag, pin `template-ref` to the same tag so workflow and scripts stay in sync.
+
+Run the deploy parser locally against a saved result:
+
+```bash
+sf project deploy start --target-org MyOrg --json > deploy-result.json
+node scripts/deploy-report.js deploy-result.json deploy-summary.md
+```
+
+When the deployment fails the workflow skips the Apex tests, comments the PR with the failing components, lines and hints, and fails the job. When it succeeds the comment shows the test summary as before.
 
 ## 🚀 How to Use
 
@@ -179,6 +210,7 @@ jobs:
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
+| `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
 
 ### Salesforce CI - Secrets
 
@@ -201,6 +233,7 @@ jobs:
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
+| `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
 | `build-command` | string | **required** | Command to build/generate source (e.g., "npm run build") |
 | `build-artifact-path` | string | `'force-app'` | Path to the built source code directory |
 | `checkout-submodules` | boolean | `false` | Whether to checkout git submodules |

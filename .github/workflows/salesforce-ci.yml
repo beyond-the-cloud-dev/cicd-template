@@ -53,6 +53,11 @@ on:
         required: false
         type: string
         default: ''
+      template-ref:
+        description: 'Git ref of cicd-template to take the report scripts from. Match it with the ref in `uses:` when testing a template branch'
+        required: false
+        type: string
+        default: 'main'
     secrets:
       SFDX_AUTH_URL_DEVHUB:
         description: 'SFDX Auth URL for Dev Hub'
@@ -72,6 +77,16 @@ jobs:
     steps:
       - name: 📥 Checkout source code
         uses: actions/checkout@v4
+
+      # Scripts live in this template repo, not in the caller, so check them out.
+      # github.job_workflow_sha is empty for reusable workflows, hence the input.
+      - name: 📥 Checkout CI scripts
+        uses: actions/checkout@v4
+        with:
+          repository: beyond-the-cloud-dev/cicd-template
+          ref: ${{ inputs.template-ref }}
+          path: .cicd-template
+          sparse-checkout: scripts
 
       - name: 🟢 Setup Node.js ${{ inputs.node-version }}
         uses: actions/setup-node@v4
@@ -111,12 +126,25 @@ jobs:
           echo "✓ Successfully created scratch org"
 
       - name: 🚀 Deploy source to scratch org
+        id: deploy
+        continue-on-error: true
         run: |
-          sf project deploy start --target-org ScratchOrg --wait ${{ inputs.deploy-wait }}
-          echo "✓ Successfully deployed source"
+          mkdir -p ./tests/apex
+          sf project deploy start \
+            --target-org ScratchOrg \
+            --wait ${{ inputs.deploy-wait }} \
+            --json > ./tests/apex/deploy-result.json
+
+      - name: 🔎 Parse deployment result
+        id: deploy-report
+        if: always()
+        env:
+          DEPLOY_STEP_OUTCOME: ${{ steps.deploy.outcome }}
+        run: node .cicd-template/scripts/deploy-report.js ./tests/apex/deploy-result.json ./tests/apex/deploy-summary.md
 
       - name: 🧪 Run Apex tests
         id: run-tests
+        if: steps.deploy-report.outputs.status == 'success'
         continue-on-error: true
         run: |
           sf apex run test \
@@ -128,7 +156,7 @@ jobs:
             --wait ${{ inputs.test-wait }}
 
       - name: 📊 Parse test results and create report
-        if: always()
+        if: always() && steps.deploy-report.outputs.status == 'success'
         id: parse-results
         run: |
           REPORT_FILE="./tests/apex/test-failures-report.log"
@@ -223,87 +251,26 @@ jobs:
           path: ./tests/apex
           retention-days: 30
 
-      - name: 💬 Comment PR with test results
+      - name: 💬 Comment PR with results
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          DEPLOY_STATUS: ${{ steps.deploy-report.outputs.status }}
+          DEPLOY_SUMMARY_FILE: ./tests/apex/deploy-summary.md
+          TEST_SUMMARY_FILE: ./tests/apex/test-summary.txt
+          TEST_HAS_FAILURES: ${{ steps.parse-results.outputs.has_failures }}
+          TEST_TOTAL: ${{ steps.parse-results.outputs.total_tests }}
+          TEST_PASSED: ${{ steps.parse-results.outputs.passed }}
+          TEST_FAILED: ${{ steps.parse-results.outputs.failed }}
+          WORKFLOW_FILE: salesforce-ci.yml
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const path = './tests/apex/test-summary.txt';
-
-            if (!fs.existsSync(path)) {
-              console.log('No test summary file found, skipping PR comment');
-              return;
-            }
-
-            let summary = fs.readFileSync(path, 'utf8');
-            const hasFailures = '${{ steps.parse-results.outputs.has_failures }}' === 'true';
-            const totalTests = '${{ steps.parse-results.outputs.total_tests }}';
-            const passed = '${{ steps.parse-results.outputs.passed }}';
-            const failed = '${{ steps.parse-results.outputs.failed }}';
-            const runId = '${{ github.run_id }}';
-            const repo = context.repo;
-
-            // Construct artifact URL
-            const artifactUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId}`;
-
-            // Build comment body
-            let commentBody = '## 🧪 Apex Test Results\n\n';
-
-            if (hasFailures) {
-              commentBody += '### ❌ Tests Failed\n\n';
-            } else {
-              commentBody += '### ✅ All Tests Passed\n\n';
-            }
-
-            commentBody += '```\n' + summary + '\n```\n\n';
-
-            // Add link to full artifact
-            commentBody += `📦 **[Download Full Test Results & Logs](${artifactUrl})**\n\n`;
-
-            // Truncate if too long (GitHub comment limit is 65536 chars)
-            const maxLength = 65000;
-            if (commentBody.length > maxLength) {
-              commentBody = commentBody.substring(0, maxLength) + '\n\n... (truncated)\n\n';
-              commentBody += `⚠️ **Comment truncated due to size.** [Download full results](${artifactUrl})\n`;
-            }
-
-            commentBody += `\n---\n📊 Stats: ${totalTests} total | ✅ ${passed} passed | ❌ ${failed} failed\n`;
-            commentBody += `🤖 _Automated comment by [Salesforce CI](.github/workflows/salesforce-ci.yml)_`;
-
-            // Find existing comment to update or create new
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: repo.owner,
-              repo: repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('🧪 Apex Test Results')
-            );
-
-            if (botComment) {
-              // Update existing comment
-              await github.rest.issues.updateComment({
-                owner: repo.owner,
-                repo: repo.repo,
-                comment_id: botComment.id,
-                body: commentBody
-              });
-            } else {
-              // Create new comment
-              await github.rest.issues.createComment({
-                owner: repo.owner,
-                repo: repo.repo,
-                issue_number: context.issue.number,
-                body: commentBody
-              });
-            }
+            const comment = require('./.cicd-template/scripts/pr-comment.js');
+            await comment({ github, context, core });
 
       - name: 🔄 Convert Apex coverage to LCOV
-        if: inputs.upload-to-codecov && inputs.codecov-slug != '' && success()
+        if: inputs.upload-to-codecov && inputs.codecov-slug != '' && steps.deploy-report.outputs.status == 'success'
         run: |
           echo y | sf plugins install apex-code-coverage-transformer@2.23.2
           sf acc-transformer transform \
@@ -313,7 +280,7 @@ jobs:
           echo "✓ Coverage converted to LCOV format"
 
       - name: 📈 Upload coverage to Codecov
-        if: inputs.upload-to-codecov && inputs.codecov-slug != '' && success()
+        if: inputs.upload-to-codecov && inputs.codecov-slug != '' && steps.deploy-report.outputs.status == 'success'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -321,10 +288,14 @@ jobs:
           flags: Apex
           files: ./tests/apex/lcov.info
 
-      - name: ❌ Fail workflow if tests failed
-        if: steps.parse-results.outputs.has_failures == 'true'
+      - name: ❌ Fail workflow if deployment or tests failed
+        if: steps.deploy-report.outputs.status != 'success' || steps.parse-results.outputs.has_failures == 'true'
         run: |
-          echo "❌ Apex tests failed. Check the test results artifact for details."
+          if [ "${{ steps.deploy-report.outputs.status }}" != "success" ]; then
+            echo "❌ Deployment failed (status: ${{ steps.deploy-report.outputs.status }}). See the deployment report above."
+          else
+            echo "❌ Apex tests failed. Check the test results artifact for details."
+          fi
           exit 1
 
       - name: 🧹 Cleanup scratch org
