@@ -317,7 +317,7 @@ jobs:
       - name: 🔄 Convert Apex coverage to LCOV
         if: inputs.upload-to-codecov && inputs.codecov-slug != '' && steps.deploy-report.outputs.status == 'success'
         run: |
-          echo y | sf plugins install apex-code-coverage-transformer
+          echo y | sf plugins install apex-code-coverage-transformer@2.23.2
           sf acc-transformer transform \
             --coverage-json ./tests/apex/test-result-codecoverage.json \
             --format lcovonly \
