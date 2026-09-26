@@ -43,6 +43,11 @@ on:
         required: false
         type: string
         default: 'config/project-scratch-def.json'
+      source-dirs:
+        description: 'Space-separated source dirs to deploy (e.g. "force-app examples"). Empty deploys every packageDirectory from sfdx-project.json'
+        required: false
+        type: string
+        default: ''
       upload-to-codecov:
         description: 'Upload coverage to Codecov'
         required: false
@@ -128,10 +133,17 @@ jobs:
       - name: 🚀 Deploy source to scratch org
         id: deploy
         continue-on-error: true
+        env:
+          SOURCE_DIRS: ${{ inputs.source-dirs }}
         run: |
           mkdir -p ./tests/apex
+          SOURCE_ARGS=()
+          for dir in $SOURCE_DIRS; do
+            SOURCE_ARGS+=(--source-dir "$dir")
+          done
           sf project deploy start \
             --target-org ScratchOrg \
+            "${SOURCE_ARGS[@]}" \
             --wait ${{ inputs.deploy-wait }} \
             --json > ./tests/apex/deploy-result.json
 
