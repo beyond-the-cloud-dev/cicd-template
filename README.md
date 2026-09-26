@@ -208,6 +208,7 @@ jobs:
 | `test-wait` | number | `30` | Test timeout (min) |
 | `test-level` | string | `'RunLocalTests'` | Test level (RunLocalTests, RunAllTestsInOrg) |
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
+| `source-dirs` | string | `''` | Space-separated dirs to deploy (e.g. `"force-app examples"`). Empty deploys every `packageDirectory` from `sfdx-project.json` |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
 | `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
