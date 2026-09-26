@@ -194,22 +194,6 @@ jobs:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
 ```
 
-### 4. CI for a lib that depends on other libs
-Dependencies are cloned and deployed as source into the scratch org before the project, no package install. One per line, `owner/repo@ref[:dir,dir]`. `ref` is a branch or tag (repo default branch if omitted), `dir` defaults to the packaged `packageDirectories` of that repo.
-```yaml
-jobs:
-  salesforce-ci:
-    uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
-    with:
-      dependencies: |
-        beyond-the-cloud-dev/soql-lib@v6.12.0
-        beyond-the-cloud-dev/dml-lib@main:package
-      source-dirs: 'package examples'
-    secrets:
-      SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
-      DEPENDENCIES_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN }} # only for private dependency repos
-```
-
 ## ⚙️ Configuration Parameters
 
 ### Salesforce CI - Inputs
@@ -225,7 +209,6 @@ jobs:
 | `test-level` | string | `'RunLocalTests'` | Test level (RunLocalTests, RunAllTestsInOrg) |
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `source-dirs` | string | `''` | Space-separated dirs to deploy (e.g. `"force-app examples"`). Empty deploys every `packageDirectory` from `sfdx-project.json` |
-| `dependencies` | string | `''` | Libs deployed as source before the project, one per line: `owner/repo@ref[:dir,dir]` (see example 4) |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
 | `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
@@ -236,7 +219,6 @@ jobs:
 |--------|----------|------|
 | `SFDX_AUTH_URL_DEVHUB` | ✅ Yes | Dev Hub authentication URL |
 | `CODECOV_TOKEN` | ❌ No | Codecov token (only if upload-to-codecov=true) |
-| `DEPENDENCIES_TOKEN` | ❌ No | Token with read access to private `dependencies` repos. Public repos are cloned with the default `GITHUB_TOKEN` |
 
 ### Salesforce CI with Build - Inputs
 

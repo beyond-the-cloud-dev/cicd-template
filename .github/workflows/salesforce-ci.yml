@@ -48,11 +48,6 @@ on:
         required: false
         type: string
         default: ''
-      dependencies:
-        description: 'Libs deployed as source before the project, one per line: owner/repo@ref[:dir,dir]. ref is a branch or tag (default branch if omitted), dir defaults to the packaged packageDirectories of that repo'
-        required: false
-        type: string
-        default: ''
       upload-to-codecov:
         description: 'Upload coverage to Codecov'
         required: false
@@ -72,9 +67,6 @@ on:
       SFDX_AUTH_URL_DEVHUB:
         description: 'SFDX Auth URL for Dev Hub'
         required: true
-      DEPENDENCIES_TOKEN:
-        description: 'Token to clone private dependency repos (public ones work without it)'
-        required: false
       CODECOV_TOKEN:
         description: 'Codecov token for coverage upload'
         required: false
@@ -137,42 +129,6 @@ jobs:
             --duration-days ${{ inputs.scratch-org-duration }} \
             --set-default
           echo "✓ Successfully created scratch org"
-
-      # Each dependency is deployed from its own checkout, so its sfdx-project.json
-      # (API version, package dirs) applies and nothing lands in the caller's tree.
-      - name: 📚 Deploy dependencies
-        if: inputs.dependencies != ''
-        env:
-          DEPENDENCIES: ${{ inputs.dependencies }}
-          GH_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN || github.token }}
-        run: |
-          i=0
-          for dep in $DEPENDENCIES; do
-            i=$((i + 1))
-            spec="${dep%%:*}"
-            repo="${spec%%@*}"
-            ref=""; [[ "$spec" == *@* ]] && ref="${spec#*@}"
-            dirs=""; [[ "$dep" == *:* ]] && dirs="${dep#*:}"
-            target="$RUNNER_TEMP/dependencies/$i-${repo##*/}"
-
-            echo "::group::📚 $repo${ref:+@$ref}"
-            gh repo clone "$repo" "$target" -- --quiet --depth 1 --config advice.detachedHead=false ${ref:+--branch "$ref"}
-            if [ -z "$dirs" ]; then
-              dirs=$(jq -r '[.packageDirectories[] | select(.package)] | if length > 0 then . else [.packageDirectories[] | select(.default)] end | .[].path' "$target/sfdx-project.json")
-            fi
-            SOURCE_ARGS=()
-            for dir in ${dirs//,/ }; do
-              SOURCE_ARGS+=(--source-dir "$dir")
-            done
-            (
-              cd "$target"
-              sf project deploy start \
-                --target-org ScratchOrg \
-                "${SOURCE_ARGS[@]}" \
-                --wait ${{ inputs.deploy-wait }}
-            )
-            echo "::endgroup::"
-          done
 
       - name: 🚀 Deploy source to scratch org
         id: deploy
