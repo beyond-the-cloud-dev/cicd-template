@@ -271,14 +271,6 @@ jobs:
 
           cat "$SUMMARY_FILE"
 
-      - name: 📊 Upload test results as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: apex-test-results
-          path: ./tests/apex
-          retention-days: 30
-
       - name: 💬 Comment PR with results
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -299,12 +291,33 @@ jobs:
 
       - name: 🔄 Convert Apex coverage to LCOV
         if: inputs.upload-to-codecov && inputs.codecov-slug != '' && steps.deploy-report.outputs.status == 'success'
+        env:
+          SOURCE_DIRS: ${{ inputs.source-dirs }}
         run: |
+          # Coverage maps to files by class name. With source-dirs set, skip the
+          # package dirs that were not deployed, so a class that also lives in one
+          # of them (e.g. a generated copy) is reported on the deployed file.
+          IGNORE_ARGS=()
+          if [ -n "$SOURCE_DIRS" ]; then
+            DEPLOYED=" "
+            for dir in $SOURCE_DIRS; do
+              dir="${dir#./}"
+              DEPLOYED+="${dir%/} "
+            done
+            for dir in $(jq -r '.packageDirectories[].path' sfdx-project.json); do
+              dir="${dir#./}"
+              case "$DEPLOYED" in
+                *" ${dir%/} "*) ;;
+                *) IGNORE_ARGS+=(--ignore-package-directory "$dir") ;;
+              esac
+            done
+          fi
           echo y | sf plugins install apex-code-coverage-transformer@2.23.2
           sf acc-transformer transform \
             --coverage-json ./tests/apex/test-result-codecoverage.json \
             --format lcovonly \
-            --output-report ./tests/apex/lcov.info
+            --output-report ./tests/apex/lcov.info \
+            "${IGNORE_ARGS[@]}"
           echo "✓ Coverage converted to LCOV format"
 
       - name: 📈 Upload coverage to Codecov
@@ -315,6 +328,14 @@ jobs:
           slug: ${{ inputs.codecov-slug }}
           flags: Apex
           files: ./tests/apex/lcov.info
+
+      - name: 📊 Upload test results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-test-results
+          path: ./tests/apex
+          retention-days: 30
 
       - name: ❌ Fail workflow if deployment or tests failed
         if: steps.deploy-report.outputs.status != 'success' || steps.parse-results.outputs.has_failures == 'true'

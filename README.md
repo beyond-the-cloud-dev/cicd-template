@@ -232,7 +232,7 @@ curl -fsSL https://raw.githubusercontent.com/beyond-the-cloud-dev/cicd-template/
 | `test-wait` | number | `30` | Test timeout (min) |
 | `test-level` | string | `'RunLocalTests'` | Test level (RunLocalTests, RunAllTestsInOrg) |
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
-| `source-dirs` | string | `''` | Space-separated dirs to deploy (e.g. `"force-app examples"`). Empty deploys every `packageDirectory` from `sfdx-project.json` |
+| `source-dirs` | string | `''` | Space-separated dirs to deploy (e.g. `"force-app examples"`). Empty deploys every `packageDirectory` from `sfdx-project.json`. Coverage is then reported only on these dirs, so a class that also lives in another package dir (e.g. a generated copy) is not counted twice |
 | `deploy-dependencies` | boolean | `false` | Deploy the package dependencies from `sfdx-project.json` as source first (see example 4) |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
