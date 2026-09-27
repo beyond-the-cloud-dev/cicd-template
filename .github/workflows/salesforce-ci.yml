@@ -48,6 +48,11 @@ on:
         required: false
         type: string
         default: ''
+      deploy-dependencies:
+        description: 'Deploy the package dependencies from sfdx-project.json as source before the project (repo and tag derived from the package alias, see scripts/deploy-dependencies.sh)'
+        required: false
+        type: boolean
+        default: false
       upload-to-codecov:
         description: 'Upload coverage to Codecov'
         required: false
@@ -67,6 +72,9 @@ on:
       SFDX_AUTH_URL_DEVHUB:
         description: 'SFDX Auth URL for Dev Hub'
         required: true
+      DEPENDENCIES_TOKEN:
+        description: 'Token to clone private dependency repos (public ones work without it)'
+        required: false
       CODECOV_TOKEN:
         description: 'Codecov token for coverage upload'
         required: false
@@ -129,6 +137,14 @@ jobs:
             --duration-days ${{ inputs.scratch-org-duration }} \
             --set-default
           echo "✓ Successfully created scratch org"
+
+      - name: 📚 Deploy dependencies
+        if: inputs.deploy-dependencies
+        env:
+          GH_TOKEN: ${{ secrets.DEPENDENCIES_TOKEN || github.token }}
+          DEPENDENCIES_OWNER: ${{ github.repository_owner }}
+          DEPLOY_WAIT: ${{ inputs.deploy-wait }}
+        run: bash .cicd-template/scripts/deploy-dependencies.sh ScratchOrg
 
       - name: 🚀 Deploy source to scratch org
         id: deploy

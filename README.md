@@ -60,6 +60,7 @@ Parsing and PR commenting live in [`scripts/`](./scripts/), not inline in the wo
 | `scripts/deploy-report.js` | Reads the JSON output of `sf project deploy start --json`, groups component failures, writes a Markdown report (PR comment + job summary), emits `::error file=...,line=...` annotations and sets step outputs `status`, `error_count`, `warning_count`, `summary_file` |
 | `scripts/deploy-tips.js` | List of known deployment error patterns with a short hint on how to fix each one. Add a new entry when you hit an error that deserves a hint |
 | `scripts/pr-comment.js` | Builds and posts (or updates) the single `🚀 Salesforce CI` comment on the pull request from the deploy report and test summary |
+| `scripts/deploy-dependencies.sh` | Deploys the package dependencies from `sfdx-project.json` as source (used by `deploy-dependencies: true`, also runs locally) |
 
 A reusable workflow runs in the caller's checkout, so the workflow checks this repo out into `.cicd-template/` at the `template-ref` input (default `main`). To test a branch of this repo end to end from any project, point both `uses:` and `template-ref` at it:
 
@@ -194,6 +195,29 @@ jobs:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
 ```
 
+### 4. CI for a lib that depends on other libs
+Dependencies come from `sfdx-project.json`, the same list the package version is built with. Each one is deployed as source from its own repo before the project, no package install:
+
+- repo: package name lowercased with dashes, same owner (`SOQL Lib` -> `soql-lib`)
+- ref: tag `v<major>.<minor>.<patch>` from the alias or `versionNumber` (`SOQL Lib@6.12.0-1` -> `v6.12.0`, `4.0.0.LATEST` -> `v4.0.0`)
+- dir: the dependency's `packageDirectory` with that package name, without its test classes
+
+```yaml
+jobs:
+  salesforce-ci:
+    uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
+    with:
+      deploy-dependencies: true
+      source-dirs: 'package examples'
+    secrets:
+      SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
+```
+
+The same script works locally, from the lib root:
+```bash
+curl -fsSL https://raw.githubusercontent.com/beyond-the-cloud-dev/cicd-template/main/scripts/deploy-dependencies.sh | bash -s -- <scratch-org-alias>
+```
+
 ## ⚙️ Configuration Parameters
 
 ### Salesforce CI - Inputs
@@ -209,6 +233,7 @@ jobs:
 | `test-level` | string | `'RunLocalTests'` | Test level (RunLocalTests, RunAllTestsInOrg) |
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `source-dirs` | string | `''` | Space-separated dirs to deploy (e.g. `"force-app examples"`). Empty deploys every `packageDirectory` from `sfdx-project.json` |
+| `deploy-dependencies` | boolean | `false` | Deploy the package dependencies from `sfdx-project.json` as source first (see example 4) |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
 | `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
@@ -219,6 +244,7 @@ jobs:
 |--------|----------|------|
 | `SFDX_AUTH_URL_DEVHUB` | ✅ Yes | Dev Hub authentication URL |
 | `CODECOV_TOKEN` | ❌ No | Codecov token (only if upload-to-codecov=true) |
+| `DEPENDENCIES_TOKEN` | ❌ No | Read access to private dependency repos. Public ones are cloned with the default `GITHUB_TOKEN` |
 
 ### Salesforce CI with Build - Inputs
 
