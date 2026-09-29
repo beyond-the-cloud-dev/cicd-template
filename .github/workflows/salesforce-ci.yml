@@ -53,6 +53,16 @@ on:
         required: false
         type: boolean
         default: false
+      pre-deploy-command:
+        description: 'Shell command run in the checkout before anything is deployed, e.g. to turn the source into its package form'
+        required: false
+        type: string
+        default: ''
+      pr-comment:
+        description: 'Post the results comment on pull requests. Turn it off in the second of two jobs on one PR, they share the comment'
+        required: false
+        type: boolean
+        default: true
       upload-to-codecov:
         description: 'Upload coverage to Codecov'
         required: false
@@ -105,6 +115,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
+
+      - name: 🛠️ Run pre-deploy command
+        if: inputs.pre-deploy-command != ''
+        env:
+          PRE_DEPLOY_COMMAND: ${{ inputs.pre-deploy-command }}
+        run: bash -c "$PRE_DEPLOY_COMMAND"
 
       - name: 📦 Cache Salesforce CLI
         uses: actions/cache@v4
@@ -272,7 +288,7 @@ jobs:
           cat "$SUMMARY_FILE"
 
       - name: 💬 Comment PR with results
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && inputs.pr-comment
         uses: actions/github-script@v7
         env:
           DEPLOY_STATUS: ${{ steps.deploy-report.outputs.status }}

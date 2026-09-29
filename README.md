@@ -202,13 +202,17 @@ Dependencies come from `sfdx-project.json`, the same list the package version is
 - ref: tag `v<major>.<minor>.<patch>` from the alias or `versionNumber` (`SOQL Lib@6.12.0-1` -> `v6.12.0`, `4.0.0.LATEST` -> `v4.0.0`)
 - dir: the dependency's `packageDirectory` with that package name, without its test classes
 
+Typical use is a second job that checks the package form of a lib whose repo holds the public source (trigger-lib does this): turn the source into its package form, deploy the dependencies, then the lib.
+
 ```yaml
 jobs:
-  salesforce-ci:
+  package-check:
     uses: beyond-the-cloud-dev/cicd-template/.github/workflows/salesforce-ci.yml@main
     with:
+      pre-deploy-command: 'node scripts/prepare-package.mjs'
       deploy-dependencies: true
-      source-dirs: 'package examples'
+      source-dirs: 'force-app'
+      pr-comment: false # the main job already comments on the PR
     secrets:
       SFDX_AUTH_URL_DEVHUB: ${{ secrets.SFDX_AUTH_URL_DEVHUB }}
 ```
@@ -234,6 +238,8 @@ curl -fsSL https://raw.githubusercontent.com/beyond-the-cloud-dev/cicd-template/
 | `scratch-def-file` | string | `'config/project-scratch-def.json'` | Path to scratch org definition |
 | `source-dirs` | string | `''` | Space-separated dirs to deploy (e.g. `"force-app examples"`). Empty deploys every `packageDirectory` from `sfdx-project.json`. Coverage is then reported only on these dirs, so a class that also lives in another package dir (e.g. a generated copy) is not counted twice |
 | `deploy-dependencies` | boolean | `false` | Deploy the package dependencies from `sfdx-project.json` as source first (see example 4) |
+| `pre-deploy-command` | string | `''` | Shell command run in the checkout before anything is deployed, e.g. to turn the source into its package form |
+| `pr-comment` | boolean | `true` | Post the results comment on pull requests. Turn it off in the second of two jobs on one PR, they share the comment |
 | `upload-to-codecov` | boolean | `false` | Upload coverage to Codecov |
 | `codecov-slug` | string | `''` | Repository slug for Codecov (org/repo) |
 | `template-ref` | string | `'main'` | Git ref of `cicd-template` to take the report scripts from |
